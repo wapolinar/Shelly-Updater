@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.apolinarski.shelly.updater.json.Shelly;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 
 import java.io.*;
 import java.util.Arrays;
@@ -15,6 +16,7 @@ import java.util.List;
 public class StorageUtil {
 
     private static final String CONFIG_FILE = "shellies.json";
+    @NonNull
     private static final ObjectMapper mapper;
 
     static {

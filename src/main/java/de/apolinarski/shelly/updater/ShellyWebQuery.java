@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.apolinarski.shelly.updater.json.Shelly;
+import de.apolinarski.shelly.updater.json.firmware.AvailableFirmware;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.lang.NonNull;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -25,8 +27,11 @@ import java.util.concurrent.TimeUnit;
 public class ShellyWebQuery {
 
     private static final int TIMEOUT_IN_MS = 2000;
+    private static final String SHELLY_FIRMWARE_URL = "https://api.shelly.cloud/files/firmware";
 
+    @NonNull
     private final WebClient webClient;
+    @NonNull
     private final ObjectMapper mapper;
 
     public ShellyWebQuery() {
@@ -67,4 +72,23 @@ public class ShellyWebQuery {
             return new Shelly();
         }
     }
+
+    public AvailableFirmware getFirmwareInformation() {
+        WebClient.UriSpec<WebClient.RequestBodySpec> spec = webClient.method(HttpMethod.GET);
+        WebClient.RequestBodySpec bSpec = spec.uri(SHELLY_FIRMWARE_URL);
+        try {
+            String response = bSpec.accept(MediaType.APPLICATION_JSON)
+                    .acceptCharset(StandardCharsets.UTF_8)
+                    .retrieve().bodyToMono(String.class).block();
+            log.trace("Response is {}", response);
+            return  mapper.readValue(response, AvailableFirmware.class);
+        } catch (JsonProcessingException | WebClientRequestException | WebClientResponseException e) {
+            log.warn("Could not resolve firmware information from shelly API: {}",e.getMessage());
+            log.trace(e.getMessage(), e);
+            AvailableFirmware result = new AvailableFirmware();
+            result.setIsok(false);
+            return result;
+        }
+    }
+
 }

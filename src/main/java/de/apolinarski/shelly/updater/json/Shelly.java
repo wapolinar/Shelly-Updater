@@ -24,4 +24,13 @@ public class Shelly {
     @Getter
     @Setter
     private String fw;
+
+    @Override
+    public String toString() {
+        return "Shelly{" +
+                "ip='" + ip + '\'' +
+                ", type='" + type + '\'' +
+                ", fw='" + fw + '\'' +
+                '}';
+    }
 }

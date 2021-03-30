@@ -1,6 +1,10 @@
 package de.apolinarski.shelly.updater;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import de.apolinarski.shelly.updater.json.Shelly;
+import de.apolinarski.shelly.updater.json.firmware.AvailableFirmware;
+import de.apolinarski.shelly.updater.json.firmware.Data;
+import de.apolinarski.shelly.updater.json.firmware.ShellyObject;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,16 +12,22 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import java.io.File;
+import java.lang.reflect.Method;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
+import java.nio.file.Files;
+import java.util.*;
 
 @Slf4j
 @Component
 public class DiscoverQueryShellies implements CommandLineRunner {
+
+    public static final String FIRMWARE_FILE_NAME = "firmware.zip";
+    private static final String FIRMWARE_DIR = "firmware";
+    private static final String INPUT_IGNORE = "i";
+    private static final String INPUT_QUIT = "q";
+
+    private final Set<String> shellyTypes = new HashSet<>();
 
     @Autowired
     private ConfigurableApplicationContext context;
@@ -26,6 +36,8 @@ public class DiscoverQueryShellies implements CommandLineRunner {
     public void run(String... args) throws Exception {
         ShellyWebQuery query = new ShellyWebQuery();
         List<Shelly> shellyList = StorageUtil.loadUtil();
+        File fwMainDir = new File(FIRMWARE_DIR);
+        fwMainDir.mkdir();
         if (shellyList.isEmpty()) {
             log.warn("Could not load configuration file, scanning network.");
             shellyList = loadShellies(query);
@@ -33,15 +45,113 @@ public class DiscoverQueryShellies implements CommandLineRunner {
         } else {
             log.info("Loaded shellies from file:");
             for(Shelly s : shellyList) {
+                shellyTypes.add(s.getType());
+                File dir = new File(fwMainDir, s.getType());
+                if(!dir.exists()) {
+                    dir.mkdir();
+                }
+
                 log.info("Shelly ip: {}, type: {}, mac: {}, fw: {}, auth: {}", s.getIp(), s.getType(), s.getMac(),
                         s.getFw(), s.isAuth());
+            }
+        }
+        log.info("Retrieving available firmware from shelly cloud");
+        AvailableFirmware firmware = query.getFirmwareInformation();
+        if(firmware.isIsok()) {
+            Data d = firmware.getData();
+            for(Method m : Data.class.getMethods()) {
+                JsonProperty property = m.getAnnotation(JsonProperty.class);
+                if(property != null && shellyTypes.contains(property.value()) && m.getName().startsWith("get")) {
+                    log.debug("Method is {}", m.getName());
+                    ShellyObject o = (ShellyObject) m.invoke(d);
+                    String fw = extractFirmware(o.getVersion());
+                    File fwDir = new File(fwMainDir, property.value() + "/" + fw);
+                    fwDir.mkdirs();
+                    File firmwareZip = new File(fwDir, FIRMWARE_FILE_NAME);
+                    if(!firmwareZip.exists()) {
+                        downloadFirmware(o, firmwareZip);
+                    }
+                }
+            }
+        }
+        Map<String, DownloadedFirmware> availableFirmware = new HashMap<>();
+        for(String s : shellyTypes) {
+            DownloadedFirmware fw = new DownloadedFirmware(s);
+            availableFirmware.put(s, fw);
+        }
+        for(DownloadedFirmware fw : availableFirmware.values()) {
+            FirmwareVisitor visitor = new FirmwareVisitor(fw);
+            Files.walkFileTree(fwMainDir.toPath().resolve(fw.getShellyType()), visitor);
+        }
+SHELLY: for(Shelly s : shellyList) {
+            DownloadedFirmware fw = availableFirmware.get(s.getType());
+            if(fw == null) {
+                log.warn("No firmware available for {}, continuing with next shelly.", s);
+                continue;
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("Available firmware for ")
+                    .append(s)
+                    .append(":\n");
+            int counter = 1;
+            for(String availableFw : fw.getAvailableFirmwareVersions()) {
+                sb.append(counter++)
+                        .append(") ")
+                        .append(availableFw)
+                        .append('\n');
+            }
+            sb.append("Or press \"i\" to ignore this shelly or \"q\" to quit.\n");
+            System.out.println(sb.toString());
+            Scanner scanner = new Scanner(System.in);
+            while(true) {
+                String input = scanner.next();
+                if (INPUT_IGNORE.equals(input)) {
+                    continue SHELLY;
+                }
+                if (INPUT_QUIT.equals(input)) {
+                    context.close();
+                    return;
+                }
+                int option;
+                try {
+                    option = Integer.parseInt(input);
+                    updateShelly(s, fw.getFirmware(fw.getAvailableFirmwareVersions().get(option-1)));
+                    break;
+                } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                    System.out.println("Invalid command: " + input);
+                }
             }
         }
         context.close();
     }
 
+    private void updateShelly(Shelly s, File firmware) {
+        log.error("Would update shelly {} with file {}", s, firmware);
+    }
+
+    private void downloadFirmware(ShellyObject o, File firmwareZip) {
+        if(!firmwareZip.exists()) {
+            FirmwareDownloader downloader = new FirmwareDownloader(o.getUrl(), firmwareZip.toPath());
+            downloader.downloadFile();
+        } else {
+            log.info("Firmware file for version {} does already exist.", o.getVersion());
+        }
+    }
+
+    private String extractFirmware(String version) {
+        int stringStart = version.indexOf('/');
+        int stringEnd = version.indexOf('-', stringStart);
+        if(stringEnd == -1) {
+            stringEnd = version.indexOf('@', stringStart);
+        }
+        stringStart++;
+        String result =  version.substring(stringStart, stringEnd);
+        log.debug("Current version is: {}", result);
+        return result;
+    }
+
     private List<Shelly> loadShellies(ShellyWebQuery query) {
-        Enumeration<NetworkInterface> networks = null;
+        Enumeration<NetworkInterface> networks;
         try {
             networks = NetworkInterface.getNetworkInterfaces();
         } catch (SocketException e) {
