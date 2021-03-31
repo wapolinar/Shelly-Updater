@@ -1,0 +1,55 @@
+[ {
+  "ip" : "192.168.178.11",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20200601-122849/v1.7.0@d7961837"
+}, {
+  "ip" : "192.168.178.12",
+  "type" : "SHSW-1",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20200601-122823/v1.7.0@d7961837"
+}, {
+  "ip" : "192.168.178.13",
+  "type" : "SHSW-1",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20200812-090904/v1.8.0@8acf41b0"
+}, {
+  "ip" : "192.168.178.14",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20200601-122849/v1.7.0@d7961837"
+}, {
+  "ip" : "192.168.178.15",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20201228-092242/v1.9.3@ad2bb4e3"
+}, {
+  "ip" : "192.168.178.16",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20201228-092242/v1.9.3@ad2bb4e3"
+}, {
+  "ip" : "192.168.178.17",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20201228-092242/v1.9.3@ad2bb4e3"
+}, {
+  "ip" : "192.168.178.19",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20201228-092242/v1.9.3@ad2bb4e3"
+}, {
+  "ip" : "192.168.178.20",
+  "type" : "SHSW-25",
+  "mac" : "AABBCCDDEEFF",
+  "auth" : false,
+  "fw" : "20201228-092242/v1.9.3@ad2bb4e3"
+} ]

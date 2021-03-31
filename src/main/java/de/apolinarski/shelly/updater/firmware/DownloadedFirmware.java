@@ -1,4 +1,4 @@
-package de.apolinarski.shelly.updater;
+package de.apolinarski.shelly.updater.firmware;
 
 import lombok.Getter;
 import org.springframework.lang.NonNull;

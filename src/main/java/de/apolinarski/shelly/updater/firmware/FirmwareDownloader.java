@@ -1,4 +1,4 @@
-package de.apolinarski.shelly.updater;
+package de.apolinarski.shelly.updater.firmware;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;

@@ -1,13 +1,18 @@
 package de.apolinarski.shelly.updater;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.apolinarski.shelly.updater.firmware.DownloadedFirmware;
+import de.apolinarski.shelly.updater.firmware.FirmwareDownloader;
+import de.apolinarski.shelly.updater.firmware.FirmwareVisitor;
 import de.apolinarski.shelly.updater.json.Shelly;
+import de.apolinarski.shelly.updater.json.ShellyUpdating;
 import de.apolinarski.shelly.updater.json.firmware.AvailableFirmware;
 import de.apolinarski.shelly.updater.json.firmware.Data;
 import de.apolinarski.shelly.updater.json.firmware.ShellyObject;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Component;
@@ -29,21 +34,27 @@ public class DiscoverQueryShellies implements CommandLineRunner {
 
     private final Set<String> shellyTypes = new HashSet<>();
 
+    @Value("${firmware.download.wait.minutes}")
+    private int minutes;
+
     @Autowired
     private ConfigurableApplicationContext context;
 
+    @Autowired
+    private ShellyWebQuery query;
+
     @Override
     public void run(String... args) throws Exception {
-        ShellyWebQuery query = new ShellyWebQuery();
         List<Shelly> shellyList = StorageUtil.loadUtil();
         File fwMainDir = new File(FIRMWARE_DIR);
         fwMainDir.mkdir();
         if (shellyList.isEmpty()) {
             log.warn("Could not load configuration file, scanning network.");
-            shellyList = loadShellies(query);
+            shellyList = loadShellies();
             StorageUtil.saveUtil(shellyList);
         } else {
             log.info("Loaded shellies from file:");
+            //TODO: Re-evaluate the shellies for changes
             for(Shelly s : shellyList) {
                 shellyTypes.add(s.getType());
                 File dir = new File(fwMainDir, s.getType());
@@ -109,24 +120,32 @@ SHELLY: for(Shelly s : shellyList) {
                     continue SHELLY;
                 }
                 if (INPUT_QUIT.equals(input)) {
-                    context.close();
+                    waitAndCloseContext();
                     return;
                 }
                 int option;
                 try {
                     option = Integer.parseInt(input);
-                    updateShelly(s, fw.getFirmware(fw.getAvailableFirmwareVersions().get(option-1)));
+                    updateShelly(query, s, fw.getAvailableFirmwareVersions().get(option-1));
                     break;
                 } catch (NumberFormatException | IndexOutOfBoundsException e) {
                     System.out.println("Invalid command: " + input);
                 }
             }
         }
+        waitAndCloseContext();
+    }
+
+    private void waitAndCloseContext() throws InterruptedException {
+        log.info("Waiting for the shellies to download the firmware file. Waiting {} minutes", minutes);
+        Thread.sleep(minutes * 1000 * 60);
         context.close();
     }
 
-    private void updateShelly(Shelly s, File firmware) {
-        log.error("Would update shelly {} with file {}", s, firmware);
+    private void updateShelly(ShellyWebQuery query, Shelly shelly, String firmwareVersion) {
+        log.info("Request update for shelly {} with version {}", shelly, firmwareVersion);
+        ShellyUpdating updateResponse = query.requestFirmwareUpdate(shelly, firmwareVersion);
+        log.info("Shelly answer is: {}",updateResponse.getStatus());
     }
 
     private void downloadFirmware(ShellyObject o, File firmwareZip) {
@@ -150,7 +169,7 @@ SHELLY: for(Shelly s : shellyList) {
         return result;
     }
 
-    private List<Shelly> loadShellies(ShellyWebQuery query) {
+    private List<Shelly> loadShellies() {
         Enumeration<NetworkInterface> networks;
         try {
             networks = NetworkInterface.getNetworkInterfaces();
@@ -248,7 +267,19 @@ SHELLY: for(Shelly s : shellyList) {
 
         @Override
         public String toString() {
-            return String.valueOf(bytes);
+            switch(this) {
+                case PREFIX_8:
+                    return String.valueOf(8);
+                case PREFIX_16:
+                    return String.valueOf(16);
+                case PREFIX_24:
+                    return String.valueOf(24);
+                case PREFIX_32:
+                    return String.valueOf(32);
+                default:
+                    log.error("Illegal prefix: {}", this.name());
+                    return this.name();
+            }
         }
     }
 }

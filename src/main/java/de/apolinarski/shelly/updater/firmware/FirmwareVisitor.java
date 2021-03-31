@@ -1,11 +1,11 @@
-package de.apolinarski.shelly.updater;
+package de.apolinarski.shelly.updater.firmware;
 
+import de.apolinarski.shelly.updater.DiscoverQueryShellies;
+import de.apolinarski.shelly.updater.firmware.DownloadedFirmware;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
