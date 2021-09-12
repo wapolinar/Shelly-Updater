@@ -31,6 +31,7 @@ public class DiscoverQueryShellies implements CommandLineRunner {
     private static final String FIRMWARE_DIR = "firmware";
     private static final String INPUT_IGNORE = "i";
     private static final String INPUT_QUIT = "q";
+    private static final String PARAM_LOAD_SHELLIES="--load-shellies";
 
     private final Set<String> shellyTypes = new HashSet<>();
 
@@ -45,10 +46,16 @@ public class DiscoverQueryShellies implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        boolean loadShellies = false;
+        for(String arg: args) {
+            if(PARAM_LOAD_SHELLIES.equalsIgnoreCase(arg)) {
+                loadShellies = true;
+            }
+        }
         List<Shelly> shellyList = StorageUtil.loadUtil();
         File fwMainDir = new File(FIRMWARE_DIR);
         fwMainDir.mkdir();
-        if (shellyList.isEmpty()) {
+        if (shellyList.isEmpty() || loadShellies) {
             log.warn("Could not load configuration file, scanning network.");
             shellyList = loadShellies();
             StorageUtil.saveUtil(shellyList);
@@ -95,6 +102,7 @@ public class DiscoverQueryShellies implements CommandLineRunner {
             Files.walkFileTree(fwMainDir.toPath().resolve(fw.getShellyType()), visitor);
         }
 SHELLY: for(Shelly s : shellyList) {
+            updateFwInfo(s);
             DownloadedFirmware fw = availableFirmware.get(s.getType());
             if(fw == null) {
                 log.warn("No firmware available for {}, continuing with next shelly.", s);
@@ -133,7 +141,13 @@ SHELLY: for(Shelly s : shellyList) {
                 }
             }
         }
+        StorageUtil.saveUtil(shellyList);
         waitAndCloseContext();
+    }
+
+    private void updateFwInfo(Shelly s) {
+        Shelly newShellyInfo = query.createRequest(s.getIp());
+        s.setFw(newShellyInfo.getFw());
     }
 
     private void waitAndCloseContext() throws InterruptedException {
