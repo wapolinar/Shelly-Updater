@@ -61,7 +61,6 @@ public class DiscoverQueryShellies implements CommandLineRunner {
             StorageUtil.saveUtil(shellyList);
         } else {
             log.info("Loaded shellies from file:");
-            //TODO: Re-evaluate the shellies for changes
             for(Shelly s : shellyList) {
                 shellyTypes.add(s.getType());
                 File dir = new File(fwMainDir, s.getType());
