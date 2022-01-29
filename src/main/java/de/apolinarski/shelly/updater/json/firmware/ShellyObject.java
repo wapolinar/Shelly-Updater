@@ -16,6 +16,22 @@ public interface ShellyObject {
 
     public void setVersion(String version);
 
+     public default String getBetaUrl() {
+         return null;
+     }
+
+    public default void setBetaUrl(String url) {
+         // empty body
+    }
+
+    public default String getBetaVersion() {
+         return null;
+    }
+
+    public default void setBetaVersion(String version) {
+         // empty body
+    }
+
     public Map<String, Object> getAdditionalProperties();
 
     public void setAdditionalProperty(String name, Object value);

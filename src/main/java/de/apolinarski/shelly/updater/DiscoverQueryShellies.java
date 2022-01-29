@@ -88,6 +88,16 @@ public class DiscoverQueryShellies implements CommandLineRunner {
                     if(!firmwareZip.exists()) {
                         downloadFirmware(o, firmwareZip);
                     }
+                    if(o.getBetaVersion() != null) {
+                        log.debug("Beta version is available: {}", o.getBetaVersion());
+                        String betaFw = extractFirmware(o.getBetaVersion());
+                        File betaFwDir = new File(fwMainDir, property.value() + "/" + betaFw);
+                        betaFwDir.mkdirs();
+                        File betaFirmwareZip = new File(betaFwDir, FIRMWARE_FILE_NAME);
+                        if(!betaFirmwareZip.exists()) {
+                            downloadFirmware(o, betaFirmwareZip, true);
+                        }
+                    }
                 }
             }
         }
@@ -100,6 +110,7 @@ public class DiscoverQueryShellies implements CommandLineRunner {
             FirmwareVisitor visitor = new FirmwareVisitor(fw);
             Files.walkFileTree(fwMainDir.toPath().resolve(fw.getShellyType()), visitor);
         }
+        boolean uploadPending = false;
 SHELLY: for(Shelly s : shellyList) {
             updateFwInfo(s);
             DownloadedFirmware fw = availableFirmware.get(s.getType());
@@ -127,13 +138,14 @@ SHELLY: for(Shelly s : shellyList) {
                     continue SHELLY;
                 }
                 if (INPUT_QUIT.equals(input)) {
-                    waitAndCloseContext();
+                    closeContext(uploadPending);
                     return;
                 }
                 int option;
                 try {
                     option = Integer.parseInt(input);
                     updateShelly(query, s, fw.getAvailableFirmwareVersions().get(option-1));
+                    uploadPending = true;
                     break;
                 } catch (NumberFormatException | IndexOutOfBoundsException e) {
                     System.out.println("Invalid command: " + input);
@@ -141,7 +153,7 @@ SHELLY: for(Shelly s : shellyList) {
             }
         }
         StorageUtil.saveUtil(shellyList);
-        waitAndCloseContext();
+        closeContext(uploadPending);
     }
 
     private void updateFwInfo(Shelly s) {
@@ -149,9 +161,11 @@ SHELLY: for(Shelly s : shellyList) {
         s.setFw(newShellyInfo.getFw());
     }
 
-    private void waitAndCloseContext() throws InterruptedException {
-        log.info("Waiting for the shellies to download the firmware file. Waiting {} minutes", minutes);
-        Thread.sleep(minutes * 1000 * 60);
+    private void closeContext(boolean wait) throws InterruptedException {
+        if(wait) {
+            log.info("Waiting for the shellies to download the firmware file. Waiting {} minutes", minutes);
+            Thread.sleep(minutes * 1000 * 60);
+        }
         context.close();
     }
 
@@ -162,8 +176,17 @@ SHELLY: for(Shelly s : shellyList) {
     }
 
     private void downloadFirmware(ShellyObject o, File firmwareZip) {
+        downloadFirmware(o, firmwareZip, false);
+    }
+
+    private void downloadFirmware(ShellyObject o, File firmwareZip, boolean beta) {
         if(!firmwareZip.exists()) {
-            FirmwareDownloader downloader = new FirmwareDownloader(o.getUrl(), firmwareZip.toPath());
+            FirmwareDownloader downloader;
+            if(!beta) {
+                downloader = new FirmwareDownloader(o.getUrl(), firmwareZip.toPath());
+            } else {
+                downloader = new FirmwareDownloader(o.getBetaUrl(), firmwareZip.toPath());
+            }
             downloader.downloadFile();
         } else {
             log.info("Firmware file for version {} does already exist.", o.getVersion());
@@ -172,11 +195,12 @@ SHELLY: for(Shelly s : shellyList) {
 
     private String extractFirmware(String version) {
         int stringStart = version.indexOf('/');
-        int stringEnd = version.indexOf('-', stringStart);
+        int stringEnd = version.lastIndexOf('-');
         if(stringEnd == -1) {
-            stringEnd = version.indexOf('@', stringStart);
+            stringEnd = version.lastIndexOf('@');
         }
         stringStart++;
+        log.debug("version is: {}, start is: {}, end is: {}", version, stringStart, stringEnd);
         String result =  version.substring(stringStart, stringEnd);
         log.debug("Current version is: {}", result);
         return result;
